@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Control Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            padding: 5px;
+            background-color: #f8f9fa;
+            height: 100vh;
+            overflow: auto;
+            margin: 0;
+        }
+        .main-container {
+            height: calc(100vh - 10px);
+            overflow: auto;
+        }
+        .video-container {
+            height: 100%;
+            text-align: center;
+            background-color: #f8f9fa;
+            padding: 5px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 300px;
+        }
+        .video-feed {
+            max-height: calc(100vh - 45px);
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            object-fit: contain;
+        }
+        .right-panel {
+            height: 100%;
+            padding-right: 5px;
+            overflow: auto;
+        }
+        .controls, .stats {
+            background-color: white;
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            overflow: auto;
+        }
+        .form-group {
+            margin-bottom: 4px;
+        }
+        #statsContainer p {
+            font-size: 0.8em;
+            margin-bottom: 4px;
+            padding: 4px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            word-break: break-all;
+            line-height: 1.2;
+        }
+        #saveLocation {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        #saveLocation .path-label {
+            flex: 0 0 auto;
+        }
+        #saveLocation .path-value {
+            flex: 1;
+            color: #0d6efd;
+            text-decoration: none;
+        }
+        #saveLocation .path-value:hover {
+            text-decoration: underline;
+            color: #0a58ca;
+        }
+        .btn-group {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        h1 {
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+            margin-top: 0;
+        }
+        h3, h4 {
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+        }
+        .form-label {
+            font-size: 0.8rem;
+            margin-bottom: 1px;
+        }
+        .form-control-sm, .form-select-sm {
+            padding: 0.15rem 0.4rem;
+            font-size: 0.8rem;
+            height: calc(1.5em + 0.4rem + 2px);
+        }
+        .btn {
+            padding: 0.2rem 0.6rem;
+            font-size: 0.8rem;
+        }
+        .recording-indicator {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 0;
+            padding: 1px 4px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            width: fit-content;
+        }
+        .recording-indicator.active {
+            display: flex;
+        }
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #dc3545;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        .recording-text {
+            color: #dc3545;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+        .recording-indicator.loading {
+            display: flex;
+            background-color: #e8f5e9;
+        }
+        .recording-indicator.loading .recording-dot {
+            background-color: #28a745;
+            animation: none;
+        }
+        .recording-indicator.loading .recording-text {
+            color: #28a745;
+        }
+        .loading-overlay {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+        }
+        .loading-overlay.active {
+            display: block;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 10px auto;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .stats {
+            background-color: white;
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .fps-chart-container {
+            flex: 0 0 200px;
+            height: 200px;
+            margin: 4px 0;
+            position: relative;
+            display: block !important;
+        }
+        .fps-stats-row {
+            display: flex;
+            gap: 4px;
+            margin: 0;
+        }
+        .fps-stats-row p {
+            flex: 1;
+            margin: 0;
+            padding: 4px;
+        }
+        .fps-stats-section {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 6px 6px 0 6px;
+            margin: 4px 0;
+        }
+        .fps-stats-section h5 {
+            font-size: 0.85rem;
+            margin: 0 0 4px 0;
+            color: #666;
+        }
+        .stats-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .stats-header h4 {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid main-container">
+        <h1 class="text-center mb-2">Camera Control</h1>
+        
+        <div class="row h-100">
+            <!-- Video on the left -->
+            <div class="col-md-6">
+                <div class="video-container">
+                    <div class="loading-overlay active">
+                        <div class="spinner"></div>
+                        <div>Initializing Camera...</div>
+                    </div>
+                    <img src="{{ url_for('video_feed') }}" 
+                         class="video-feed" 
+                         onload="this.style.display='block'; document.querySelector('.loading-overlay').classList.remove('active')"
+                         onerror="this.style.display='none'; handleVideoError();"
+                         style="display: none">
+                    <div id="video-error" style="display: none;">
+                        <p class="text-danger">Camera unavailable</p>
+                        <button class="btn btn-primary" onclick="retryVideo()">Retry</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Controls and Stats on the right -->
+            <div class="col-md-6 right-panel">
+                <div class="row h-100">
+                    <!-- Controls -->
+                    <div class="col-6 pe-1">
+                        <div class="controls">
+                            <!-- Add the "Control Interface" button
+                            <button id="toggleControlsBtn" class="btn btn-primary mb-2" onclick="checkPassword()">Show Control Interface</button>
+                                -->
+
+
+                            <!-- Wrapper for Controls Section -->
+                            <div id="controlsSection">
+                                <div class="controls">
+                                <h3>Controls</h3>
+                                    <form id="cameraForm">
+
+                                <div class="form-group">
+                                    <label for="save_format" class="form-label">Format</label>
+                                    <select class="form-select form-select-sm" id="save_format" name="save_format">
+                                        <option value="jpeg" selected>JPEG</option>
+                                        <option value="png">PNG</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="camera_device" class="form-label">Camera</label>
+                                    <select class="form-select form-select-sm" id="camera_device" name="camera_device" onchange="updateCamera(this.value)">
+                                        <option value="0" {% if params.camera_device == 0 %}selected{% endif %}>Cam 0 (default)</option>
+                                        <option value="1" {% if params.camera_device == 1 %}selected{% endif %}>Cam 1</option>
+                                        <option value="2" {% if params.camera_device == 2 %}selected{% endif %}>Cam 2</option>
+                                        <option value="3" {% if params.camera_device == 3 %}selected{% endif %}>Cam 3</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="max_time_interval_minutes" class="form-label">Duration (min)</label>
+                                    <div class="form-check mb-1">
+                                        <input class="form-check-input" type="checkbox" id="disableDuration" onchange="toggleDuration(this.checked)" {% if params.max_time_interval_minutes == 0 %}checked{% endif %}>
+                                        <label class="form-check-label" for="disableDuration" style="font-size: 0.8rem;">
+                                            Indefinite
+                                        </label>
+                                    </div>
+                                    <input type="number" class="form-control form-control-sm" id="max_time_interval_minutes" 
+                                           name="max_time_interval_minutes" 
+                                           value="{{ params.max_time_interval_minutes }}" min="0" step="0.1"
+                                           {% if params.max_time_interval_minutes == 0 %}disabled{% endif %}>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="photos_per_second" class="form-label">Photos/sec (max: 30)</label>
+                                    <input type="number" class="form-control form-control-sm" id="photos_per_second" 
+                                           name="photos_per_second" 
+                                           value="{{ params.photos_per_second }}" min="0" max="30" step="0.1">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="resolution" class="form-label">Photo Resolution</label>
+                                    <select class="form-select form-select-sm" id="resolution" name="resolution" onchange="updateResolution(this.value)">
+                                        <option value="480,640" {% if params.frame_height == 480 %}selected{% endif %}>640 x 480</option>
+                                        <option value="600,800" {% if params.frame_height == 600 %}selected{% endif %}>800 x 600</option>
+                                        <option value="768,1024" {% if params.frame_height == 768 %}selected{% endif %}>1024 x 768</option>
+                                        <option value="720,1280" {% if params.frame_height == 720 %}selected{% endif %}>1280 x 720</option>
+                                        <option value="960,1280" {% if params.frame_height == 960 %}selected{% endif %}>1280 x 960</option>
+                                        <option value="1024,1280" {% if params.frame_height == 1024 %}selected{% endif %}>1280 x 1024</option>
+                                        <option value="1080,1920" {% if params.frame_height == 1080 %}selected{% endif %}>1920 x 1080</option>
+                                        <option value="2160,3840" {% if params.frame_height == 3840 %}selected{% endif %}>3840 x 2160</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-primary" id="startBtn">Start</button>
+                                    <button type="button" class="btn btn-danger" id="stopBtn" disabled>Stop</button>
+                                </div>
+                            </form>
+                                 </div>
+                                 </div>
+                                </div>
+                        </div>
+
+                    <!-- Stats -->
+                    <div class="col-6 ps-1">
+                        <div class="stats" id="statsContainer">
+                            <div class="stats-header">
+                                <h4>Realtime Statistics</h4>
+                                <div class="recording-indicator" id="recordingIndicator">
+                                    <div class="recording-dot"></div>
+                                    <span class="recording-text">REC</span>
+                                </div>
+                            </div>
+                            <div class="fps-stats-row">
+                                <p id="photoCount">Photos: 0</p>
+                                <p id="recordingTime">Time: 0s</p>
+                            </div>
+                            <div class="fps-stats-section">
+                                <h5>Frame Rate</h5>
+                                <div class="fps-chart-container">
+                                    <canvas id="fpsChart"></canvas>
+                                </div>
+                                <div class="fps-stats-row">
+                                    <p id="avgFps">Avg: 0</p>
+                                    <p id="photoRate">Current: 0</p>
+                                </div>
+                            </div>
+                            <p id="folderSize">Size: 0 MB</p>
+                            <p id="saveLocation">
+                                <span class="path-label">Path:</span>
+                                <a href="#" class="path-value" onclick="openFolder(event)">-</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statsContainer = document.getElementById('statsContainer');
+        let statsInterval;
+        let paramsInterval;
+        let currentFolderPath = '';
+        let startTime;
+
+        function toggleDuration(disabled) {
+            const durationInput = document.getElementById('max_time_interval_minutes');
+            durationInput.disabled = disabled;
+            if (disabled) {
+                durationInput.value = 0;
+            }
+        }
+
+        function setFormControlsState(disabled) {
+            const controls = [
+                'save_format',
+                'camera_device',
+                'max_time_interval_minutes',
+                'photos_per_second',
+                'resolution',
+                'disableDuration'
+            ];
+            
+            controls.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.disabled = disabled;
+                    // If duration is disabled by checkbox, keep it disabled
+                    if (id === 'max_time_interval_minutes' && document.getElementById('disableDuration').checked) {
+                        element.disabled = true;
+                    }
+                }
+            });
+        }
+
+        // Initialize the chart immediately when page loads
+        const ctx = document.getElementById('fpsChart').getContext('2d');
+        const fpsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'FPS',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.2,
+                    pointRadius: 0
+                }, {
+                    label: 'Average',
+                    data: [],
+                    borderColor: 'rgba(255, 99, 132, 0.8)',
+                    borderDash: [5, 5],
+                    tension: 0,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Time (seconds)'
+                        },
+                        min: function(context) {
+                            if (context.chart.data.labels.length === 0) return 0;
+                            const maxTime = Math.max(...context.chart.data.labels);
+                            const minTime = Math.min(...context.chart.data.labels);
+                            return Math.max(minTime, maxTime - 60);
+                        },
+                        max: function(context) {
+                            if (context.chart.data.labels.length === 0) return 10;
+                            return Math.max(...context.chart.data.labels);
+                        },
+                        ticks: {
+                            stepSize: 5
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Photos per Second'
+                        }
+                    }
+                },
+                animation: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        async function updateResolution(resolution) {
+            try {
+                const loadingOverlay = document.querySelector('.loading-overlay');
+                loadingOverlay.querySelector('div:last-child').textContent = 'Changing Resolution...';
+                loadingOverlay.classList.add('active');
+                
+                const response = await fetch('/update_resolution', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ resolution: resolution })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const videoFeed = document.querySelector('.video-feed');
+                    videoFeed.style.display = 'none';  // Hide feed while loading
+                    videoFeed.src = '{{ url_for('video_feed') }}?' + new Date().getTime();
+                    
+                    // Wait for the new feed to load
+                    videoFeed.onload = () => {
+                        videoFeed.style.display = 'block';
+                        loadingOverlay.classList.remove('active');
+                    };
+                } else {
+                    console.error('Failed to update resolution:', result.message);
+                    loadingOverlay.querySelector('div:last-child').textContent = 'Failed to change resolution';
+                    setTimeout(() => loadingOverlay.classList.remove('active'), 2000);
+                }
+            } catch (error) {
+                console.error('Failed to update resolution:', error);
+                const loadingOverlay = document.querySelector('.loading-overlay');
+                loadingOverlay.querySelector('div:last-child').textContent = 'Failed to change resolution';
+                setTimeout(() => loadingOverlay.classList.remove('active'), 2000);
+            }
+        }
+
+        function openFolder(event) {
+            event.preventDefault();
+            if (currentFolderPath) {
+                fetch('/open_folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ path: currentFolderPath })
+                });
+            }
+        }
+
+        async function updateCamera(device) {
+            try {
+                const loadingOverlay = document.querySelector('.loading-overlay');
+                loadingOverlay.querySelector('div:last-child').textContent = 'Changing Camera...';
+                loadingOverlay.classList.add('active');
+                
+                const response = await fetch('/update_camera', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ camera_device: parseInt(device) })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const videoFeed = document.querySelector('.video-feed');
+                    videoFeed.style.display = 'none';  // Hide feed while loading
+                    videoFeed.src = '{{ url_for('video_feed') }}?' + new Date().getTime();
+                    
+                    // Wait for the new feed to load
+                    videoFeed.onload = () => {
+                        videoFeed.style.display = 'block';
+                        loadingOverlay.classList.remove('active');
+                    };
+                } else {
+                    console.error('Failed to update camera:', result.message);
+                    loadingOverlay.querySelector('div:last-child').textContent = 'Failed to change camera';
+                    setTimeout(() => loadingOverlay.classList.remove('active'), 2000);
+                }
+            } catch (error) {
+                console.error('Failed to update camera:', error);
+                const loadingOverlay = document.querySelector('.loading-overlay');
+                loadingOverlay.querySelector('div:last-child').textContent = 'Failed to change camera';
+                setTimeout(() => loadingOverlay.classList.remove('active'), 2000);
+            }
+        }
+
+        startBtn.addEventListener('click', async () => {
+            // Disable form controls and start button   
+
+            setFormControlsState(true);
+            startBtn.disabled = true;
+            
+            
+
+            // Reset all stats displays first
+            document.getElementById('photoCount').textContent = 'Photos: 0';
+            document.getElementById('recordingTime').textContent = 'Time: 0s';
+            document.getElementById('photoRate').textContent = 'Current: 0';
+            document.getElementById('avgFps').textContent = 'Avg: 0';
+            document.getElementById('folderSize').textContent = 'Size: 0 MB';
+            document.getElementById('saveLocation').querySelector('.path-value').textContent = '-';
+            currentFolderPath = '';
+
+
+            // Ensure stats container is visible
+            statsContainer.style.display = 'flex';
+
+            const formData = {
+                save_format: document.getElementById('save_format').value,
+                camera_device: parseInt(document.getElementById('camera_device').value),
+                max_time_interval_minutes: parseFloat(document.getElementById('max_time_interval_minutes').value),
+                photos_per_second: parseFloat(document.getElementById('photos_per_second').value),
+                resolution: document.getElementById('resolution').value
+            };
+
+            // Show loading indicator
+            const recordingIndicator = document.getElementById('recordingIndicator');
+            recordingIndicator.classList.add('loading');
+            recordingIndicator.querySelector('.recording-text').textContent = 'Loading...';
+            
+            const response = await fetch('/start_recording', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                stopBtn.disabled = false;
+                statsContainer.style.display = 'block';
+                startStatsPolling();
+            } else {
+                // If there's an error, re-enable controls and start button
+                setFormControlsState(false);
+                startBtn.disabled = false;
+                // If there's an error, remove the loading indicator
+                recordingIndicator.classList.remove('loading');
+            }
+        });
+
+        stopBtn.addEventListener('click', async () => {
+            stopRecording()
+            clearInterval(statsInterval);
+        });
+        
+
+        async function stopRecording() {
+            stopBtn.disabled = true;
+            document.getElementById('recordingIndicator').classList.remove('active');
+            
+            const response = await fetch('/stop_recording', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                // Show a temporary "Stopping..." message
+                //document.getElementById('photoRate').textContent = 'Current: Stopping...';
+                
+                // Wait for recording to fully stop
+                let retries = 0;
+                let finalStats = null;
+                
+                while (retries < 10) {
+                    const statusResponse = await fetch('/get_stats');
+                    const status = await statusResponse.json();
+                    
+                    if (status.recording === false) {
+                        finalStats = status;
+                        break;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    retries++;
+                }
+
+                // Enable start button and form controls regardless of whether we got final stats
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                setFormControlsState(false);
+                document.getElementById('recordingIndicator').classList.remove('active');
+
+                // Update stats if we got them
+                if (finalStats) {
+                    document.getElementById('photoCount').textContent = `Photos: ${finalStats.count}`;
+                    document.getElementById('recordingTime').textContent = `Time: ${finalStats.time} ${finalStats.time_unit}`;
+                    document.getElementById('photoRate').textContent = `Current: ${finalStats.rate} Pho/sec`;
+                    document.getElementById('avgFps').textContent = `Avg: ${finalStats.avg_fps.toFixed(1)} Pho/sec`;
+                    document.getElementById('folderSize').textContent = `Size: ${finalStats.folder_size.size} ${finalStats.folder_size.unit}`;
+                    const pathLink = document.querySelector('#saveLocation .path-value');
+                    pathLink.textContent = finalStats.folder;
+                    currentFolderPath = finalStats.folder;
+                }
+            } else {
+                // Re-enable stop button and restore recording indicator if stop request failed
+                stopBtn.disabled = false;
+                document.getElementById('recordingIndicator').classList.add('active');
+            }
+        }
+        
+
+        function startStatsPolling() {
+            // Just clear the existing data
+            fpsChart.data.labels = [];
+            fpsChart.data.datasets[0].data = [];
+            fpsChart.data.datasets[1].data = [];
+            fpsChart.update('none');  // Update without animation
+            
+            startTime = Date.now();
+            
+            
+
+            // Poll for recording status and basic stats every 250ms
+            statsInterval = setInterval(async () => {
+                const response = await fetch('/get_stats');
+                const stats = await response.json();
+
+                
+                if (Object.keys(stats).length > 0) {
+                    const recordingIndicator = document.getElementById('recordingIndicator');
+                    
+                    // Handle camera initialization status
+                    if (stats.camera_ready) {
+                        recordingIndicator.classList.remove('loading');
+                        recordingIndicator.classList.add('active');
+                        recordingIndicator.querySelector('.recording-text').textContent = 'REC';
+                    }
+                    
+                    if (stats.recording === false ) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        if (stats.camera_ready) {
+                            stopRecording()
+                            clearInterval(statsInterval) }
+                    ;}   
+
+                    // Update recording status and form controls
+                    if (stats.recording === false) {
+                        recordingIndicator.classList.remove('active');
+                        recordingIndicator.classList.remove('loading');
+                        recordingIndicator.querySelector('.recording-text').textContent = 'Stopped';
+                        startBtn.disabled = false;
+                        setFormControlsState(false);
+                        stopBtn.disabled = true;
+                        stopRecording()
+                    } else if (stats.recording === true) {
+                        recordingIndicator.classList.add('active');
+                        recordingIndicator.classList.remove('loading');
+                        recordingIndicator.querySelector('.recording-text').textContent = 'REC';
+                        startBtn.disabled = true;
+                        setFormControlsState(true);
+                        stopBtn.disabled = false;
+                    }
+                    
+                    // Update basic stats
+                    document.getElementById('photoCount').textContent = `Photos: ${stats.count}`;
+                    document.getElementById('recordingTime').textContent = `Time: ${stats.time} ${stats.time_unit}`;
+                    document.getElementById('photoRate').textContent = `Current: ${stats.rate} Pho/sec`;
+                    document.getElementById('folderSize').textContent = `Size: ${stats.folder_size.size} ${stats.folder_size.unit}`;
+                    const pathLink = document.querySelector('#saveLocation .path-value');
+                    pathLink.textContent = stats.folder;
+                    currentFolderPath = stats.folder;
+
+                    // Update chart with new FPS data only if recording
+                    if (stats.recording === true) {
+                        const elapsedTime = (Date.now() - startTime) / 1000;
+                        fpsChart.data.labels.push(elapsedTime.toFixed(1));
+                        fpsChart.data.datasets[0].data.push(stats.rate);
+                        
+                        // Calculate and update average FPS (excluding first point)
+                        if (fpsChart.data.datasets[0].data.length > 1) {
+                            const dataWithoutFirst = fpsChart.data.datasets[0].data.slice(1);
+                            const avgFps = dataWithoutFirst.reduce((a, b) => a + b, 0) / dataWithoutFirst.length;
+                            document.getElementById('avgFps').textContent = `Avg: ${avgFps.toFixed(1)} Pho/sec`;
+                            
+                            // Update average line in chart
+                            fpsChart.data.datasets[1].data = new Array(fpsChart.data.labels.length).fill(avgFps);
+                        }
+                        
+                        // Keep only last 60 seconds of data
+                        const maxDataPoints = 120; // 60 seconds at 2 updates per second
+                        if (fpsChart.data.labels.length > maxDataPoints) {
+                            fpsChart.data.labels.shift();
+                            fpsChart.data.datasets[0].data.shift();
+                            fpsChart.data.datasets[1].data.shift();
+                        }
+                        fpsChart.update();
+                    }
+                }
+            }, 250);
+
+            // Poll for parameters every 1000ms (1 second)
+            //paramsInterval = setInterval(async () => {
+                //const response = await fetch('/get_stats');
+                //const stats = await response.json();
+                
+                //if (stats.current_params) {
+                    //document.getElementById('save_format').value = stats.current_params.save_format;
+                    //document.getElementById('camera_device').value = stats.current_params.camera_device;
+                    //document.getElementById('max_time_interval_minutes').value = stats.current_params.max_time_interval_minutes;
+                    //document.getElementById('photos_per_second').value = stats.current_params.photos_per_second;
+                    //document.getElementById('resolution').value = stats.current_params.resolution;
+                    
+                    // Update duration checkbox state
+                    //const disableDurationCheckbox = document.getElementById('disableDuration');
+                    //if (stats.current_params.max_time_interval_minutes === 0) {
+                        //disableDurationCheckbox.checked = true;
+                        //document.getElementById('max_time_interval_minutes').disabled = true;
+                    //} else {
+                        //disableDurationCheckbox.checked = false;
+                        //document.getElementById('max_time_interval_minutes').disabled = false;
+                    //}
+                //}
+            //}, 1000);
+        }
+
+        // Start polling immediately
+        // startStatsPolling();
+
+
+
+
+        function checkPassword() {
+            const correctPassword = "the password"; // Change this to your desired password
+            let userPassword = prompt("Enter the password:");
+
+            if (userPassword === correctPassword) {
+                        // Get the button and the controls section
+        const toggleButton = document.getElementById('toggleControlsBtn');
+        const controlsSection = document.getElementById('controlsSection');
+
+
+        // Toggle visibility of the controls section
+                if (controlsSection.style.display === 'none' || controlsSection.style.display === '') {
+        controlsSection.style.display = 'block';
+        toggleButton.textContent = 'Hide Control Interface';
+    } else {
+        controlsSection.style.display = 'none';
+        toggleButton.textContent = 'Show Control Interface';
+    }
+;
+            } else {
+                alert("Incorrect password! Action denied.");
+            }
+        }
+    </script>
+</body>
+</html>
