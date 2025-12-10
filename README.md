@@ -3,6 +3,8 @@
 This project implements a **real-time fabric defect detection system** using computer vision and AI.  
 It integrates a live camera feed, an AI model (YOLOv8n), and a web interface to visualize and save predictions.
 
+A video describing the use and performance of this project can be found at https://www.youtube.com/watch?v=wq12DnKXmt4
+
 ---
 
 ## ⭐ Features
@@ -163,4 +165,4 @@ Recommended:
 
 ## 📝 License
 
-Research and educational use only.
+This project is licensed under the MIT License — see the LICENSE file for details.
